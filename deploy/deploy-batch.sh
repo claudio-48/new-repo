@@ -32,7 +32,6 @@ Usage: $0 <command> [options]
 Commands:
   all <instance> <method>       Deploy su tutti i clienti
   clients <list> <instance>     Deploy su clienti specifici
-  group <group> <instance>      Deploy su gruppo (definito in config)
   
 Options:
   --method METHOD    Metodo deploy (cvs, git, rsync) - default: cvs

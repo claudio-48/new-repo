@@ -31,11 +31,11 @@ Multi-Client Deployment Script
 
 Deploy su server di produzione o staging di diversi clienti usando configurazione centralizzata.
 
-Usage: $0 <client> <instance> <method> [options]
+Usage: $0 <client> <project> <method> [options]
 
 Arguments:
   client      ID cliente (da deployment-clients.conf)
-  instance    Istanza da deployare (oacs-a, oacs-b, etc.)
+  project     Progetto CVS o Git da deployare (alter-4-0, viae ecc.)
   method      Metodo deploy: cvs, git, o rsync
 
 Options:
@@ -46,7 +46,6 @@ Commands:
   list                Lista tutti i clienti configurati
   show <client>       Mostra configurazione cliente
   test <client>       Test connessione cliente
-  instances <client>  Lista istanze disponibili per cliente
 
 Examples:
   $0 list
@@ -78,15 +77,14 @@ load_client_config() {
     fi
     
     # Parse configurazione
-    IFS='|' read -r CLIENT_ID PROD_SERVER PROD_USER PROD_BASE CVS_PROJECT INSTANCES <<< "$config_line"
+    IFS='|' read -r CLIENT_ID PROD_SERVER PROD_USER PROD_BASE PROJECT <<< "$config_line"
     
     # Export variabili
     export CLIENT_ID
     export PROD_SERVER
     export PROD_USER
     export PROD_BASE    
-    export CVS_PROJECT
-    export INSTANCES
+    export PROJECT
     
     client_info "Cliente: ${CLIENT_ID}"
     client_info "Server: ${PROD_SERVER}"
@@ -110,12 +108,12 @@ list_clients() {
     printf "%-15s %-30s %-10s %-20s\n" "CLIENT" "SERVER" "USER" "INSTANCES"
     echo "────────────────────────────────────────────────────────────────"
     
-    while IFS='|' read -r client_id server user dir cvsproj instances; do
+    while IFS='|' read -r client_id server user dir proj ; do
         # Salta commenti e linee vuote
         [[ "$client_id" =~ ^#.*$ ]] && continue
         [ -z "$client_id" ] && continue
         
-        printf "%-15s %-30s %-10s %-20s\n" "$client_id" "$server" "$user" "$instances"
+        printf "%-15s %-30s %-10s %-20s\n" "$client_id" "$server" "$user" "$proj"
     done < "$CONFIG_FILE"
     
     echo ""
@@ -139,8 +137,7 @@ show_client() {
     echo "Server Produzione:    ${PROD_SERVER}"
     echo "User SSH:             ${PROD_USER}"
     echo "CVS Root:             ${CVSROOT:-Non configurato}"
-    echo "CVS Project:          ${CVS_PROJECT}"
-    echo "Istanze Disponibili:  ${INSTANCES}"
+    echo "Project:              ${PROJECT}"
     echo ""
     echo "Comando SSH:"
     echo "  ssh ${PROD_USER}@${PROD_SERVER}"
@@ -172,32 +169,11 @@ test_client() {
     echo ""
 }
 
-# Lista istanze cliente
-list_instances() {
-    local client_id=$1
-    
-    if [ -z "$client_id" ]; then
-        error "Specificare ID cliente"
-    fi
-    
-    load_client_config "$client_id"
-    
-    echo ""
-    echo "Istanze disponibili per ${CLIENT_ID}:"
-    echo ""
-    
-    IFS=',' read -ra INSTANCE_ARRAY <<< "$INSTANCES"
-    for instance in "${INSTANCE_ARRAY[@]}"; do
-        instance=$(echo "$instance" | xargs)
-        echo "  - ${instance}"
-    done
-    echo ""
-}
 
 # Deploy function
 deploy() {
     local client_id=$1
-    local instance=$2
+    local proj=$2
     local method=$3
     local dry_run=$4
     local force=$5
@@ -206,8 +182,8 @@ deploy() {
     load_client_config "$client_id"
 
     # Verifica che istanza sia valida per questo cliente
-    if [[ ! ",${INSTANCES}," =~ ",${instance}," ]]; then
-        error "Istanza '${instance}' non configurata per cliente '${CLIENT_ID}'. Istanze disponibili: ${INSTANCES}"
+    if [[ ! ",${PROJECT}," =~ ",${proj}," ]]; then
+        error "Progetto '${proj}' non configurato per cliente '${CLIENT_ID}'. Progetti disponibili: ${PROJECT}"
     fi
     
     # Verifica CVS se metodo è cvs
@@ -222,7 +198,7 @@ deploy() {
     echo ""
     echo "Cliente:    ${CLIENT_ID}"
     echo "Server:     ${PROD_SERVER}"
-    echo "Istanza:    ${instance}"
+    echo "Progetto:   ${proj}"
     echo "Metodo:     ${method}"
     [ -n "$dry_run" ] && echo "Modalità:   DRY RUN (simulazione)"
     echo ""
@@ -243,7 +219,7 @@ deploy() {
         echo "  1. Test connessione SSH a ${PROD_USER}@${PROD_SERVER}"
         echo "  2. Backup su ${PROD_SERVER}/backups"
         echo "  3. Deploy con metodo: ${method}"
-        echo "  4. Restart istanza"
+        echo "  4. Restart istanze"
         echo ""
         info "Usa senza --dry-run per eseguire realmente"
         exit 0
@@ -256,11 +232,9 @@ deploy() {
     
     # Usa production-deploy-remote.sh se esiste
     if [ -f "${SCRIPT_DIR}/production-deploy-remote.sh" ]; then
-        # Imposta variabili d'ambiente per lo script
-        export CVS_PROJECT
         
         "${SCRIPT_DIR}/production-deploy-remote.sh" \
-            "${instance}" \
+            "${proj}" \
             "${method}" \
             "${PROD_SERVER}" \
             "${PROD_USER}" \
@@ -283,16 +257,13 @@ case "$COMMAND" in
     test)
         test_client "$2"
         ;;
-    instances)
-        list_instances "$2"
-        ;;
     help|-h|--help)
         show_help
         ;;
     *)
         # Deploy command
         CLIENT_ID=$1
-        INSTANCE=$2
+        PROJECT=$2
         METHOD=${3:-cvs}
         
         # Parse options
@@ -315,10 +286,10 @@ case "$COMMAND" in
             shift
         done
         
-        if [ -z "$CLIENT_ID" ] || [ -z "$INSTANCE" ]; then
-            error "Specificare client e instance. Usa '$0 help' per aiuto"
+        if [ -z "$CLIENT_ID" ] || [ -z "$PROJECT" ]; then
+            error "Specificare client e progetto. Usa '$0 help' per aiuto"
         fi
         
-        deploy "$CLIENT_ID" "$INSTANCE" "$METHOD" "$DRY_RUN" "$FORCE"
+        deploy "$CLIENT_ID" "$PROJECT" "$METHOD" "$DRY_RUN" "$FORCE"
         ;;
 esac

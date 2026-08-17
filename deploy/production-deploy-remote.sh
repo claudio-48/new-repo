@@ -6,7 +6,7 @@
 set -e
 
 # Configurazione
-INSTANCE=${1:-}
+PROJECT=${1:-}
 DEPLOY_METHOD=${2:-cvs}
 PROD_SERVER=${3:-prod.example.com}
 PROD_USER=${4:-root}
@@ -15,15 +15,14 @@ PROD_BASE=${5:-/data/app}
 # leggo le variabili d'ambiente DEV_BASE e CVSROOT
 . env.sh
 
-# Path locali (sviluppo)
-DEV_PATH="${DEV_BASE}/shared/${CVS_PROJECT}/packages"
-
-# Path remoti (produzione)
-PROD_PATH="${PROD_BASE}/clients/${INSTANCE}/packages"
-
 # CVS
 CVSROOT=${CVSROOT:-}
-CVS_PROJECT=${CVS_PROJECT:-}
+
+# Path locali (sviluppo)
+DEV_PATH="${DEV_BASE}/shared/${PROJECT}/packages"
+
+# Path remoti (produzione)
+PROD_PATH="${PROD_BASE}/shared/${PROJECT}/packages"
 
 # Colori
 RED='\033[0;31m'
@@ -44,10 +43,10 @@ Production Remote Deployment Script
 
 Deploy da server di sviluppo a server remoto.
 
-Usage: $0 <instance> <method> <prod_server> <prod_user> 
+Usage: $0 <project> <method> <prod_server> <prod_user> 
 
 Arguments:
-  instance      Nome istanza (oacs-a o oacs-b)
+  project       Nome progetto CVS o Git
   method        Metodo deploy: cvs, git, o rsync
   prod_server   Server produzione (default: prod.example.com)
   prod_user     User SSH (default: root)
@@ -64,7 +63,7 @@ Prerequisiti:
 
 Environment Variables:
   CVSROOT              CVS repository root
-  CVS_PROJECT          CVS project 
+  PROJECT              CVS o Git project 
 
 EOF
     exit 0
@@ -75,8 +74,8 @@ if [ "$1" == "help" ] || [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
     show_help
 fi
 
-if [ -z "$INSTANCE" ]; then
-    error "Specificare l'istanza"
+if [ -z "$PROJECT" ]; then
+    error "Specificare il progetto CVS o Git"
 fi
 
 # Pre-flight checks
@@ -132,7 +131,7 @@ deploy_cvs() {
     # CVS update
     info "Esecuzione CVS update..."
 
-    info "ssh ${PROD_USER}@${PROD_SERVER} PROD_CONTAINER=${PROD_CONTAINER} PROD_PATH=${PROD_PATH} CVSROOT=${CVSROOT}"
+    info "ssh ${PROD_USER}@${PROD_SERVER} PROD_PATH=${PROD_PATH} CVSROOT=${CVSROOT}"
     ssh ${PROD_USER}@${PROD_SERVER} \
         "cd ${PROD_PATH} && cvs -d ${CVSROOT} -q update -d -P" \
         || error "CVS update fallito"    
@@ -177,7 +176,7 @@ main() {
     echo "========================================="
     echo "Sviluppo:   $(HOSTNAME)"
     echo "Produzione: ${PROD_SERVER}"
-    echo "Istanza:    ${INSTANCE}"
+    echo "Progetto:   ${PROJECT}"
     echo "Metodo:     ${DEPLOY_METHOD}"
     echo "Timestamp:  ${TIMESTAMP}"
     if [ "$DEPLOY_METHOD" == "cvs" ]; then
@@ -200,8 +199,9 @@ main() {
             ;;
     esac
     echo ""
-    
-    post_deploy
+
+    # Da rivedere per eventuale ripartenza delle istanze
+    # post_deploy
     echo ""
     
     info "========================================="

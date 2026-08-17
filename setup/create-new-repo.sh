@@ -84,8 +84,8 @@ echo "Il repo ${NEW_REPO} è stato importato."
 rm -rf /tmp/${NEW_REPO}
 
 # Ora eseguo il checkout nella cartella ${NEW_BASE}/shared
-mkdir -p ${NEW_BASE}/shared/${NEW_REPO}/packages
-cd ${NEW_BASE}/shared/${NEW_REPO}/packages
+mkdir -p ${NEW_BASE}/shared
+cd ${NEW_BASE}/shared
 cvs co ${NEW_REPO} || true
 
 echo "Eseguito checkout del nuovo repo ${NEW_REPO}"

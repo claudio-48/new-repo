@@ -1,7 +1,9 @@
 #!/bin/bash
 # status.sh
 
-BASE="${DEV_BASE}/clienti"
+. env.sh
+
+BASE="${DEV_BASE}/clients"
 
 printf "%-20s %-12s %-10s\n" "CLIENTE" "OPENACS" "STATO"
 printf "%-20s %-12s %-10s\n" "-------" "-------" "-----"
