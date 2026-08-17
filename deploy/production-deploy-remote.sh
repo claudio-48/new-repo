@@ -1,0 +1,217 @@
+#!/bin/bash
+# production-deploy-remote.sh
+# Deploy completo da sviluppo a produzione su server remoto
+# Supporta CVS, Git e rsync
+
+set -e
+
+# Configurazione
+INSTANCE=${1:-}
+DEPLOY_METHOD=${2:-cvs}
+PROD_SERVER=${3:-prod.example.com}
+PROD_USER=${4:-root}
+PROD_BASE=${5:-/data/app}
+
+# leggo le variabili d'ambiente DEV_BASE e CVSROOT
+. env.sh
+
+# Path locali (sviluppo)
+DEV_PATH="${DEV_BASE}/shared/${CVS_PROJECT}/packages"
+
+# Path remoti (produzione)
+PROD_PATH="${PROD_BASE}/clients/${INSTANCE}/packages"
+
+# CVS
+CVSROOT=${CVSROOT:-}
+CVS_PROJECT=${CVS_PROJECT:-}
+
+# Colori
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+info() { echo -e "${GREEN}[INFO]${NC} $1"; }
+warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
+error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
+step() { echo -e "${BLUE}▶${NC} $1"; }
+
+# Help
+show_help() {
+    cat << EOF
+Production Remote Deployment Script
+
+Deploy da server di sviluppo a server remoto.
+
+Usage: $0 <instance> <method> <prod_server> <prod_user> 
+
+Arguments:
+  instance      Nome istanza (oacs-a o oacs-b)
+  method        Metodo deploy: cvs, git, o rsync
+  prod_server   Server produzione (default: prod.example.com)
+  prod_user     User SSH (default: root)
+
+Examples:
+  $0 oacs-a cvs prod.server.com root prod
+  $0 oacs-b rsync 192.168.1.100 deploy staging
+  $0 oacs-a git prod.server.com root prod
+
+Prerequisiti:
+  - SSH key-based authentication configurato
+  - CVS repository accessibile da entrambi i server (per metodo cvs)
+  - Git repository accessibile da produzione (per metodo git)
+
+Environment Variables:
+  CVSROOT              CVS repository root
+  CVS_PROJECT          CVS project 
+
+EOF
+    exit 0
+}
+
+# Verifica argomenti
+if [ "$1" == "help" ] || [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
+    show_help
+fi
+
+if [ -z "$INSTANCE" ]; then
+    error "Specificare l'istanza"
+fi
+
+# Pre-flight checks
+preflight_checks() {
+    step "Pre-flight checks..."
+    
+    # Test connessione SSH
+    info "Test connessione SSH a ${PROD_SERVER}..."
+    if ! ssh -o ConnectTimeout=5 ${PROD_USER}@${PROD_SERVER} "echo ok" >/dev/null 2>&1; then
+        error "Impossibile connettersi a ${PROD_USER}@${PROD_SERVER}"
+    fi
+    info "✓ Connessione SSH OK"
+    
+    # Check specifici per metodo
+    case $DEPLOY_METHOD in
+        cvs)
+            # Verifica CVS locale
+            if [ ! -d "${DEV_PATH}/CVS" ]; then
+                error "Directory ${DEV_PATH} non è sotto CVS"
+            fi
+            info "✓ Repository CVS trovato localmente"
+            
+            # Ottieni CVSROOT se non settato
+            if [ -z "$CVSROOT" ]; then
+                CVSROOT=$(cat ${DEV_PATH}/CVS/Root)
+            fi
+            info "  CVSROOT: ${CVSROOT}"
+            ;;
+            
+        git)
+            # Verifica Git remoto
+            if [ ! -d "${PROD_PATH}/.git" ]; then
+                error "Directory ${DEV_PATH} non è sotto Git"
+            fi	    
+            info "✓ Repository Git configurato in produzione"
+            ;;
+            
+        rsync)
+            # Verifica path sviluppo
+            if [ ! -d "${DEV_PATH}" ]; then
+                error "Directory sviluppo ${DEV_PATH} non trovata"
+            fi
+            info "✓ Directory sviluppo trovata"
+            ;;
+    esac
+    
+}
+
+# Deploy CVS
+deploy_cvs() {
+    step "Deploy tramite CVS..."
+       
+    # CVS update
+    info "Esecuzione CVS update..."
+
+    info "ssh ${PROD_USER}@${PROD_SERVER} PROD_CONTAINER=${PROD_CONTAINER} PROD_PATH=${PROD_PATH} CVSROOT=${CVSROOT}"
+    ssh ${PROD_USER}@${PROD_SERVER} \
+        "cd ${PROD_PATH} && cvs -d ${CVSROOT} -q update -d -P" \
+        || error "CVS update fallito"    
+    
+    info "✓ Codice aggiornato da CVS"
+}
+
+# Deploy Git
+deploy_git() {
+    step "Deploy tramite Git..."
+       
+    info "Esecuzione git pull remoto..."
+
+    ssh ${PROD_USER}@${PROD_SERVER} "
+        git stash && \
+        git pull origin main
+    " || error "Git pull fallito"
+    
+    info "✓ Codice aggiornato da Git"
+}
+
+# Post-deploy
+post_deploy() {
+    step "Operazioni post-deploy..."
+    
+    info "Restart istanza remota (richiederà la password) ..."
+    ssh ${PROD_USER}@${PROD_SERVER} "
+        sudo systemctl restart ${INSTANCE}.service
+    " >/dev/null 2>&1
+    
+    info "Attesa startup (15 secondi)..."
+    sleep 15
+}
+
+# Main
+main() {
+    TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+    
+    echo ""
+    echo "========================================="
+    echo "  🚀 OpenACS Remote Deployment"
+    echo "========================================="
+    echo "Sviluppo:   $(HOSTNAME)"
+    echo "Produzione: ${PROD_SERVER}"
+    echo "Istanza:    ${INSTANCE}"
+    echo "Metodo:     ${DEPLOY_METHOD}"
+    echo "Timestamp:  ${TIMESTAMP}"
+    if [ "$DEPLOY_METHOD" == "cvs" ]; then
+        echo "CVSROOT:    ${CVSROOT}"
+    fi
+    echo ""
+  
+    preflight_checks
+    echo ""
+
+    case $DEPLOY_METHOD in
+        cvs)
+            deploy_cvs
+            ;;
+        git)
+            deploy_git
+            ;;
+        *)
+            error "Metodo non supportato: ${DEPLOY_METHOD}"
+            ;;
+    esac
+    echo ""
+    
+    post_deploy
+    echo ""
+    
+    info "========================================="
+    info "  ✅ Deploy remoto completato!"
+    info "========================================="
+    info ""
+    info "Server:  ${PROD_SERVER}"
+    info "Metodo:  ${DEPLOY_METHOD}"
+    echo ""
+}
+
+# Execute
+main

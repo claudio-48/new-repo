@@ -1,0 +1,32 @@
+Server DEV instances
+
+ISTANZA                   VERSIONE    REPO
+
+accounting                 5.10.0     alter-4-0
+accounting-dev             5.10.0     alter-4-0
+alter-dev                  5.10.0     alter-4-0
+cano-dev                   5.8.3d1    alter
+canogs-dev                 5.8.3d1    alter
+iter2019-dev               5.10.1     iter-2019
+iter2019-portal-dev        5.10.1     iter-2019
+iter-dev                   5.8.1d2    iter
+iter-portal-dev            5.8.1d2    iter
+oasisoftware               5.9.1d17
+viae-idrico                5.8.1      viae
+viae-riscossione           5.8.0d4    viae
+
+Server Alter PROD instances
+
+ISTANZA                   VERSIONE    REPO
+
+adhoc                      5.8.1d2    alter
+adhoc-dev                  5.8.1d2    alter
+alter-carnevali            5.8.3d1    alter
+alter-carnevali-dev        5.8.3d1    alter
+alter-ilfood               5.8.3d1    alter
+alter-ilfood-dev           5.8.3d1    alter
+alter-oltrebolla-due       5.8.3d1    alter
+alter-oltrebolla-due-dev   5.8.3d1    alter
+cano                       5.8.3d1    alter
+canogs                     5.8.3d1    alter
+canoserv                   5.8.3d1    alter
