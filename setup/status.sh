@@ -3,7 +3,7 @@
 
 . env.sh
 
-BASE="${DEV_BASE}/clients"
+BASE="${NEW_BASE}/clients"
 
 printf "%-20s %-12s %-10s\n" "CLIENTE" "OPENACS" "STATO"
 printf "%-20s %-12s %-10s\n" "-------" "-------" "-----"

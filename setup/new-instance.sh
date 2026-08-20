@@ -48,6 +48,9 @@ if [ ! -d "$OPENACS_STD" ]; then
     exit 1
 fi
 
+# Controllo spazio disco
+./check-disk-usage.sh
+
 mkdir -p $CLIENTE_DIR/{etc,www,tcl,log,content-repository-content-files,content-repository-fattura-elettronica,packages}
 
 # Popolo la cartella www 

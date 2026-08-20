@@ -8,7 +8,7 @@
 # nostri prodotti ad es. alter-dev
 #
 # es. di chiamata:
-# new-oacs-version.sh alter-dev 
+# new-standard.sh alter-dev 
 #
 # N.B. Lo script usa le variabili d'ambiente DEV_BASE, NEW_BASE e
 #      CUSTOM_PACKAGES contenute in env.sh che devono quindi essere
@@ -20,7 +20,7 @@
 
 set -euo pipefail
 
-# Leggo le variabili d'ambiente DEV_BASE e NEW_BASE
+# Leggo le variabili d'ambiente DEV_BASE, NEW_BASE e CUSTOM_PACKAGES
 . env.sh
 
 INSTANCE="${1:-alter-dev}"
@@ -40,6 +40,9 @@ if [ ! -f "$CUSTOM_PACKAGES" ]; then
     echo "Errore: File $CUSTOM_PACKAGES non trovato."
     exit 1
 fi
+
+# Controllo spazio disco
+./check-disk-usage.sh
 
 # estrapolo la versione di OpenACS
 VERSION=$(awk -F'"' '/version name=/ {print $2}' ${SOURCE_DIR}/packages/acs-kernel/acs-kernel.info)

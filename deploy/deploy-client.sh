@@ -29,7 +29,7 @@ show_help() {
     cat << EOF
 Multi-Client Deployment Script
 
-Deploy su server di produzione o staging di diversi clienti usando configurazione centralizzata.
+Deploy su server di produzione o staging di un cliente usando configurazione centralizzata.
 
 Usage: $0 <client> <project> <method> [options]
 
@@ -193,7 +193,7 @@ deploy() {
     
     echo ""
     echo "════════════════════════════════════════════════════════════════"
-    echo "  Deploy Multi-Cliente"
+    echo "  Deploy Cliente"
     echo "════════════════════════════════════════════════════════════════"
     echo ""
     echo "Cliente:    ${CLIENT_ID}"

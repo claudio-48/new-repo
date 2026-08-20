@@ -2,8 +2,7 @@
 
 # =======================================================================
 # Questo script legge un'istanza modello (alter, viae, iter ecc) ed
-# utilizza i package custom tipici del prodotto per creare il nuovo repo
-# e contestualmente popolare la cartella 'shared'.
+# utilizza i package custom tipici del prodotto per creare il nuovo repo.
 #
 # Lo script prende come argomenti:
 # 1. Un'istanza modello di uno dei nostri prodotti (ad es. alter-dev)
@@ -12,14 +11,14 @@
 # es. di chiamata:
 # $0 alter-dev alter-4-0 alter-package-names
 #
-# N.B. Lo script usa le variabili d'ambiente DEV_BASE, NEW_BASE,
-#      CUSTOM_PACKAGES e CVSROOT contenute in env.sh che devono quindi
-#      essere impostate prima di lanciare lo script. 
+# N.B. Lo script usa le variabili d'ambiente DEV_BASE, CUSTOM_PACKAGES
+#      e CVSROOT contenute in env.sh che devono quindi essere impostate
+#      prima di lanciare lo script. 
 # =======================================================================
 
 set -euo pipefail
 
-# Leggo le variabili d'ambiente DEV_BASE, NEW_BASE, CUSTOM_PACKAGES e CVSROOT
+# Leggo le variabili d'ambiente DEV_BASE, CUSTOM_PACKAGES e CVSROOT
 . env.sh
 
 # Trovo la cartella contenente lo script in esecuzione
@@ -40,6 +39,9 @@ if [ ! -f "$CUSTOM_PACKAGES" ]; then
     echo "Errore: File $CUSTOM_PACKAGES non trovato."
     exit 1
 fi
+
+# Controllo spazio disco
+./check-disk-usage.sh
 
 # Preparazione destinazioni
 rm -rf "$CUSTOM_DEST"
@@ -79,14 +81,4 @@ echo "Importazione nuovo repo ${NEW_REPO}"
 cvs -q import -m "Initial import" ${NEW_REPO} Oasi start || true
 
 echo "Il repo ${NEW_REPO} è stato importato."
-
-# Rimuovo la cartella usata per importare il codice nel nuovo repo
-rm -rf /tmp/${NEW_REPO}
-
-# Ora eseguo il checkout nella cartella ${NEW_BASE}/shared
-mkdir -p ${NEW_BASE}/shared
-cd ${NEW_BASE}/shared
-cvs co ${NEW_REPO} || true
-
-echo "Eseguito checkout del nuovo repo ${NEW_REPO}"
 
