@@ -44,7 +44,7 @@ OPENACS_STD="${NEW_BASE}/shared/openacs-$OPENACS_VER"
 
 # Verifica che la versione richiesta sia disponibile
 if [ ! -d "$OPENACS_STD" ]; then
-    echo "ERRORE: OpenACS $OPENACS_VER non trovato in $BASE/shared/"
+    echo "ERRORE: OpenACS $OPENACS_VER non trovato in ${NEW_BASE}/shared/"
     exit 1
 fi
 
