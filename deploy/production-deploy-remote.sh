@@ -11,6 +11,7 @@ DEPLOY_METHOD=${2:-cvs}
 PROD_SERVER=${3:-prod.example.com}
 PROD_USER=${4:-root}
 PROD_BASE=${5:-/data/app}
+INSTANCE=${5:-}
 
 # leggo le variabili d'ambiente DEV_BASE e CVSROOT
 . env.sh
@@ -18,12 +19,20 @@ PROD_BASE=${5:-/data/app}
 # CVS
 CVSROOT=${CVSROOT:-}
 
-# Path locali (sviluppo)
-DEV_PATH="${DEV_BASE}/shared/${PROJECT}/packages"
-
-# Path remoti (produzione)
-PROD_PATH="${PROD_BASE}/shared/${PROJECT}/packages"
-
+# Devo impostare le variabili DEV_PATH e PROD_PATH in funzione del metodo richiesto
+if [ "${DEPLOY_METHOD}" == "rsync" ]; then
+    # devo aggiornare le cartelle www, etc e tcl di una specifica istanza
+    # Path locali (sviluppo)
+    DEV_PATH="${DEV_BASE}/clients/${INSTANCE}"
+    # Path remoti (produzione)
+    PROD_PATH="${PROD_BASE}/clients/${INSTANCE}"
+else
+    # Path locali (sviluppo)
+    DEV_PATH="${DEV_BASE}/shared/${PROJECT}/packages"
+    # Path remoti (produzione)
+    PROD_PATH="${PROD_BASE}/shared/${PROJECT}/packages"
+fi
+    
 # Colori
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -43,18 +52,19 @@ Production Remote Deployment Script
 
 Deploy da server di sviluppo a server remoto.
 
-Usage: $0 <project> <method> <prod_server> <prod_user> 
+Usage: $0 <project> <method> <prod_server> <prod_user> <prod_base> <instance> 
 
 Arguments:
   project       Nome progetto CVS o Git
   method        Metodo deploy: cvs, git, o rsync
   prod_server   Server produzione (default: prod.example.com)
   prod_user     User SSH (default: root)
+  prod_base     Radice del percorso dei sorgenti
+  instance      Nome dell'istanza (solo per rsync)
 
 Examples:
-  $0 oacs-a cvs prod.server.com root prod
-  $0 oacs-b rsync 192.168.1.100 deploy staging
-  $0 oacs-a git prod.server.com root prod
+  $0 alter cvs prod.server.com root /var/www/sources carnevali
+  $0 alter-4-0 rsync 192.168.1.100 claudio /var/www/sources alter-c1
 
 Prerequisiti:
   - SSH key-based authentication configurato
@@ -64,6 +74,7 @@ Prerequisiti:
 Environment Variables:
   CVSROOT              CVS repository root
   PROJECT              CVS o Git project 
+  INSTANCE             Nome istanza per metodo rsync
 
 EOF
     exit 0
@@ -74,7 +85,7 @@ if [ "$1" == "help" ] || [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
     show_help
 fi
 
-if [ -z "$PROJECT" ]; then
+if [ -z "$PROJECT" -a "DEPLOY_METHOD" != "rsync"]; then
     error "Specificare il progetto CVS o Git"
 fi
 
@@ -153,6 +164,31 @@ deploy_git() {
     info "✓ Codice aggiornato da Git"
 }
 
+# Deploy rsync
+deploy_rsync () {
+
+    local src="${DEV_PATH}"
+    local dst="${PROD_USER}@${PROD_SERVER}:${PROD_PATH}"
+
+    # tcl: --delete sicuro, sono solo script
+    rsync -av --delete \
+        ${src}/tcl/ \
+        ${dst}/tcl/
+
+    # etc: --delete sicuro, sono solo script
+    rsync -av --delete \
+        ${src}/etc/ \
+        ${dst}/etc/    
+
+    # www: no --delete, i file caricati dagli utenti non esistono in dev
+    rsync -av \
+        --exclude='*.tmp' \
+        ${src}/www/ \
+        ${dst}/www/
+
+    echo "✓ ${INSTANCE} sincronizzata su ${PROD_SERVER}"
+}
+
 # Post-deploy
 post_deploy() {
     step "Operazioni post-deploy..."
@@ -194,6 +230,9 @@ main() {
         git)
             deploy_git
             ;;
+	rsync)
+	    deploy_rsync
+	    ;;
         *)
             error "Metodo non supportato: ${DEPLOY_METHOD}"
             ;;

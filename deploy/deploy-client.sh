@@ -77,7 +77,7 @@ load_client_config() {
     fi
     
     # Parse configurazione
-    IFS='|' read -r CLIENT_ID PROD_SERVER PROD_USER PROD_BASE PROJECT <<< "$config_line"
+    IFS='|' read -r CLIENT_ID PROD_SERVER PROD_USER PROD_BASE PROJECT INSTANCE <<< "$config_line"
     
     # Export variabili
     export CLIENT_ID
@@ -85,6 +85,7 @@ load_client_config() {
     export PROD_USER
     export PROD_BASE    
     export PROJECT
+    export INSTANCE
     
     client_info "Cliente: ${CLIENT_ID}"
     client_info "Server: ${PROD_SERVER}"
@@ -138,6 +139,7 @@ show_client() {
     echo "User SSH:             ${PROD_USER}"
     echo "CVS Root:             ${CVSROOT:-Non configurato}"
     echo "Project:              ${PROJECT}"
+    echo "Instance:             ${INSTANCE}"    
     echo ""
     echo "Comando SSH:"
     echo "  ssh ${PROD_USER}@${PROD_SERVER}"
@@ -190,6 +192,11 @@ deploy() {
     if [ "$method" == "cvs" ] && [ -z "$CVSROOT" ]; then
         error "Metodo CVS richiesto ma CVSROOT non configurato per cliente '${CLIENT_ID}'"
     fi
+
+    # Verifica presenza di INSTANCE se metodo è rsync
+    if [ "$method" == "rsync" ] && [ -z "$INSTANCE" ]; then
+        error "Metodo rsync richiesto ma INSTANCE non presente per cliente '${CLIENT_ID}'"
+    fi    
     
     echo ""
     echo "════════════════════════════════════════════════════════════════"
@@ -238,7 +245,8 @@ deploy() {
             "${method}" \
             "${PROD_SERVER}" \
             "${PROD_USER}" \
-	    "${PROD_BASE}"
+	    "${PROD_BASE}" \
+	    "${INSTANCE}"
     else
         error "Script production-deploy-remote.sh non trovato in ${SCRIPT_DIR}"
     fi
