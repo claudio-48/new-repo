@@ -86,6 +86,8 @@ load_client_config() {
     export PROD_BASE    
     export PROJECT
     export INSTANCE
+
+    info "load_client_config INSTANCE=$INSTANCE"
     
     client_info "Cliente: ${CLIENT_ID}"
     client_info "Server: ${PROD_SERVER}"
@@ -195,6 +197,7 @@ deploy() {
 
     # Verifica presenza di INSTANCE se metodo è rsync
     if [ "$method" == "rsync" ] && [ -z "$INSTANCE" ]; then
+	info "Metodo rsync INSTANCE=$INSTANCE"
         error "Metodo rsync richiesto ma INSTANCE non presente per cliente '${CLIENT_ID}'"
     fi    
     

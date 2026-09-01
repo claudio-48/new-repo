@@ -11,7 +11,7 @@ DEPLOY_METHOD=${2:-cvs}
 PROD_SERVER=${3:-prod.example.com}
 PROD_USER=${4:-root}
 PROD_BASE=${5:-/data/app}
-INSTANCE=${5:-}
+INSTANCE=${6:-}
 
 # leggo le variabili d'ambiente DEV_BASE e CVSROOT
 . env.sh
@@ -44,6 +44,8 @@ info() { echo -e "${GREEN}[INFO]${NC} $1"; }
 warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 step() { echo -e "${BLUE}▶${NC} $1"; }
+
+info "Parametri ricevuti: $1 - $2 - $3 - $4 - $5"
 
 # Help
 show_help() {
@@ -85,7 +87,7 @@ if [ "$1" == "help" ] || [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
     show_help
 fi
 
-if [ -z "$PROJECT" -a "DEPLOY_METHOD" != "rsync"]; then
+if [ -z "$PROJECT" -a "DEPLOY_METHOD" != "rsync" ]; then
     error "Specificare il progetto CVS o Git"
 fi
 
@@ -126,6 +128,7 @@ preflight_checks() {
             
         rsync)
             # Verifica path sviluppo
+	    info "Claudio DEV_BASE=${DEV_BASE} DEV_PATH=${DEV_PATH}"
             if [ ! -d "${DEV_PATH}" ]; then
                 error "Directory sviluppo ${DEV_PATH} non trovata"
             fi
