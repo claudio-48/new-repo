@@ -99,24 +99,24 @@ load_client_config() {
 # Lista tutti i clienti
 list_clients() {
     echo ""
-    echo "════════════════════════════════════════════════════════════════"
+    echo "════════════════════════════════════════════════════════════════════════════════════════"
     echo "  Clienti Configurati"
-    echo "════════════════════════════════════════════════════════════════"
+    echo "════════════════════════════════════════════════════════════════════════════════════════"
     echo ""
     
     if [ ! -f "$CONFIG_FILE" ]; then
         error "File configurazione non trovato: ${CONFIG_FILE}"
     fi
     
-    printf "%-15s %-30s %-10s %-20s\n" "CLIENT" "SERVER" "USER" "INSTANCES"
-    echo "────────────────────────────────────────────────────────────────"
+    printf "%-15s %-30s %-10s %-20s %-20s\n" "CLIENT" "SERVER" "USER" "PROJECT" "INSTANCE"
+    echo "────────────────────────────────────────────────────────────────────────────────────────"
     
-    while IFS='|' read -r client_id server user dir proj ; do
+    while IFS='|' read -r client_id server user dir proj inst; do
         # Salta commenti e linee vuote
         [[ "$client_id" =~ ^#.*$ ]] && continue
         [ -z "$client_id" ] && continue
         
-        printf "%-15s %-30s %-10s %-20s\n" "$client_id" "$server" "$user" "$proj"
+        printf "%-15s %-30s %-10s %-20s %-20s\n" "$client_id" "$server" "$user" "$proj" "$inst"
     done < "$CONFIG_FILE"
     
     echo ""

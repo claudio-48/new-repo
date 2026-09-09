@@ -213,7 +213,7 @@ main() {
     echo "========================================="
     echo "  🚀 OpenACS Remote Deployment"
     echo "========================================="
-    echo "Sviluppo:   $(HOSTNAME)"
+    echo "Sviluppo:   ${HOSTNAME}"
     echo "Produzione: ${PROD_SERVER}"
     echo "Progetto:   ${PROJECT}"
     echo "Metodo:     ${DEPLOY_METHOD}"

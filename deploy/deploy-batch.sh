@@ -1,4 +1,5 @@
 #!/bin/bash
+
 # deploy-batch.sh
 # Deploy batch su più clienti contemporaneamente o in sequenza
 
@@ -30,8 +31,8 @@ Deploy su più clienti in sequenza o contemporaneamente.
 Usage: $0 <command> [options]
 
 Commands:
-  all <instance> <method>       Deploy su tutti i clienti
-  clients <list> <instance>     Deploy su clienti specifici
+  all <project> <method>       Deploy su tutti i clienti
+  clients <list> <project>     Deploy su clienti specifici
   
 Options:
   --method METHOD    Metodo deploy (cvs, git, rsync) - default: cvs
@@ -40,17 +41,17 @@ Options:
   --dry-run          Simula senza eseguire
 
 Examples:
-  # Deploy oacs-a su tutti i clienti con CVS
-  $0 all oacs-a cvs
+  # Deploy alter-4-0 su tutti i clienti con CVS
+  $0 all alter-4-0 cvs
 
   # Deploy su clienti specifici
-  $0 clients "acme,globex" oacs-a rsync
+  $0 clients "acme,globex" alter-4-0 rsync
 
   # Deploy parallelo
-  $0 all oacs-a git --parallel
+  $0 all alter-4-0 git --parallel
 
   # Dry run per vedere cosa succederà
-  $0 all oacs-a cvs --dry-run
+  $0 all alter-4-0 cvs --dry-run
 
 EOF
     exit 0
@@ -58,17 +59,28 @@ EOF
 
 # Ottieni lista clienti dal config
 get_all_clients() {
-    if [ ! -f "$CONFIG_FILE" ]; then
-        error "File configurazione non trovato: ${CONFIG_FILE}"
-    fi
-    
-    grep -v '^#' "$CONFIG_FILE" | grep -v '^[[:space:]]*$' | cut -d'|' -f1
+    local -n _codes="$1"   # nameref → popola l’array passato come secondo argomento
+    _codes=()
+
+    [[ -f "$CONFIG_FILE" ]] || { echo "Errore: file '$CONFIG_FILE' non trovato" >&2; return 1; }
+
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        # Ignora righe vuote o che iniziano con #
+        [[ -z "${line//[[:space:]]/}" || "$line" =~ ^[[:space:]]*# ]] && continue
+
+        # Prende solo il primo campo (prima del |) e toglie eventuali spazi
+        local code="${line%%|*}"
+        code="${code#"${code%%[![:space:]]*}"}"   # trim leading
+        code="${code%"${code##*[![:space:]]}"}"   # trim trailing
+
+        [[ -n "$code" ]] && _codes+=("$code")
+    done < "$CONFIG_FILE"
 }
 
 # Deploy su singolo cliente
 deploy_single() {
     local client=$1
-    local instance=$2
+    local project=$2
     local method=$3
     local dry_run=$4
     
@@ -76,23 +88,32 @@ deploy_single() {
     [ -n "$dry_run" ] && opts="--dry-run"
     
     if [ -f "${SCRIPT_DIR}/deploy-client.sh" ]; then
-        "${SCRIPT_DIR}/deploy-client.sh" "$client" "$instance" "$method" $opts --force
+        "${SCRIPT_DIR}/deploy-client.sh" "$client" "$project" "$method" $opts --force
         return $?
     else
         error "Script deploy-client.sh non trovato"
     fi
-}
+} 
 
 # Deploy su tutti i clienti
 deploy_all() {
-    local instance=$1
+    local project=$1
     local method=$2
     local parallel=$3
     local continue_on_error=$4
     local dry_run=$5
-    
-    local clients=$(get_all_clients)
-    local total=$(echo "$clients" | wc -l)
+
+    # Dichiarazione dell’array clients
+    declare -a clients
+    # Chiamata
+    get_all_clients  clients
+
+    # Verifica
+    #printf '%s\n' "${clients[@]}"
+    #printf '%s ' "${clients[@]}"
+    #echo "Totale clienti: ${#clients[@]}"
+
+    local total=${#clients[@]}
     local success=0
     local failed=0
     
@@ -101,7 +122,7 @@ deploy_all() {
     echo "  Batch Deploy - Tutti i Clienti"
     echo "════════════════════════════════════════════════════════════════"
     echo ""
-    echo "Istanza:   ${instance}"
+    echo "Progetto:  ${project}"
     echo "Metodo:    ${method}"
     echo "Clienti:   ${total}"
     echo "Parallelo: ${parallel:-No}"
@@ -122,34 +143,42 @@ deploy_all() {
     
     # Array per tracciare PIDs in modalità parallela
     declare -a pids
-    
-    for client in $clients; do
-        client=$(echo "$client" | xargs) # trim
-        
+
+    for client in "${clients[@]}"; do
+
+        [[ -z "$client" ]] && { echo "🔍 DEBUG: Client vuoto, salto"; continue; }	
+	
         if [ -n "$parallel" ]; then
             # Deploy parallelo
             info "Avvio deploy per ${client} (background)..."
-            deploy_single "$client" "$instance" "$method" "$dry_run" &
+            deploy_single "$client" "$project" "$method" "$dry_run" &
             pids+=($!)
         else
             # Deploy sequenziale
             step "Deploy su ${client}..."
-            
-            if deploy_single "$client" "$instance" "$method" "$dry_run"; then
+
+	    #echo "🔍 DEBUG: Chiamo deploy_single con: $client, $project, $method, $dry_run"
+            if deploy_single "$client" "$project" "$method" "$dry_run" < /dev/null; then
                 info "✓ Deploy ${client} completato con successo"
-                ((success++))
+                ((++success))
             else
                 warn "✗ Deploy ${client} FALLITO"
-                ((failed++))
-                
-                if [ -z "$continue_on_error" ]; then
+                ((++failed))
+
+		if [ -z "$continue_on_error" ]; then
+                    echo "🔍 DEBUG: continue_on_error è vuoto, interrompo"
                     error "Batch deploy interrotto dopo errore su ${client}"
+                    break
+                else
+                    echo "🔍 DEBUG: continue_on_error='$continue_on_error', continuo"
                 fi
             fi
-            
+
+	    echo "🔍 DEBUG: Fine iterazione per $client"
             echo ""
         fi
     done
+    echo "🔍 DEBUG: Loop terminato"
     
     # Se parallelo, attendi completamento
     if [ -n "$parallel" ]; then
@@ -157,9 +186,9 @@ deploy_all() {
         
         for pid in "${pids[@]}"; do
             if wait "$pid"; then
-                ((success++))
+                ((++success))
             else
-                ((failed++))
+                ((++failed))
             fi
         done
     fi
@@ -186,7 +215,7 @@ deploy_all() {
 # Deploy su lista clienti
 deploy_clients() {
     local client_list=$1
-    local instance=$2
+    local project=$2
     local method=$3
     local parallel=$4
     local continue_on_error=$5
@@ -199,7 +228,7 @@ deploy_clients() {
     echo "  Batch Deploy - Clienti Selezionati"
     echo "════════════════════════════════════════════════════════════════"
     echo ""
-    echo "Istanza:   ${instance}"
+    echo "Progetto:  ${project}"
     echo "Metodo:    ${method}"
     echo "Clienti:   ${client_list}"
     echo ""
@@ -209,7 +238,7 @@ deploy_clients() {
         
         step "Deploy su ${client}..."
         
-        if deploy_single "$client" "$instance" "$method" "$dry_run"; then
+        if deploy_single "$client" "$project" "$method" "$dry_run"; then
             info "✓ Deploy ${client} completato"
         else
             warn "✗ Deploy ${client} FALLITO"
@@ -231,7 +260,7 @@ case "$COMMAND" in
         show_help
         ;;
     all)
-        INSTANCE=$2
+        PROJECT=$2
         METHOD=${3:-cvs}
         PARALLEL=""
         CONTINUE=""
@@ -249,15 +278,15 @@ case "$COMMAND" in
             shift
         done
         
-        if [ -z "$INSTANCE" ]; then
-            error "Specificare istanza"
+        if [ -z "$PROJECT" ]; then
+            error "Specificare progetto"
         fi
         
-        deploy_all "$INSTANCE" "$METHOD" "$PARALLEL" "$CONTINUE" "$DRY_RUN"
+        deploy_all "$PROJECT" "$METHOD" "$PARALLEL" "$CONTINUE" "$DRY_RUN"
         ;;
     clients)
         CLIENT_LIST=$2
-        INSTANCE=$3
+        PROJECT=$3
         METHOD=${4:-cvs}
         PARALLEL=""
         CONTINUE=""
@@ -275,11 +304,11 @@ case "$COMMAND" in
             shift
         done
         
-        if [ -z "$CLIENT_LIST" ] || [ -z "$INSTANCE" ]; then
-            error "Specificare lista clienti e istanza"
+        if [ -z "$CLIENT_LIST" ] || [ -z "$PROJECT" ]; then
+            error "Specificare lista clienti e progetto"
         fi
         
-        deploy_clients "$CLIENT_LIST" "$INSTANCE" "$METHOD" "$PARALLEL" "$CONTINUE" "$DRY_RUN"
+        deploy_clients "$CLIENT_LIST" "$PROJECT" "$METHOD" "$PARALLEL" "$CONTINUE" "$DRY_RUN"
         ;;
     *)
         error "Comando sconosciuto: $COMMAND. Usa 'help' per aiuto"
